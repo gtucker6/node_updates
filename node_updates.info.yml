@@ -1,0 +1,5 @@
+name: Node Updater
+type: module
+description: Contains code to queue nodes for updates
+core: 8.x
+package: Custom

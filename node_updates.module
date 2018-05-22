@@ -1,0 +1,84 @@
+<?php
+/**
+ * Created by PhpStorm.
+ * User: gloria
+ * Date: 5/13/18
+ * Time: 1:36 PM
+ */
+
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Field\BaseFieldDefinition;
+/**
+ * Implements hook_preprocess_HOOK().
+ */
+function node_updates_cron() {
+  // todo: add field manager type storage definition checks in case machine name changes
+  $query = \Drupal::database()->select('node_field_data', 'n');
+
+
+  // todo: import queue cron settings
+  $query->condition('queued', 0);
+  $query->condition('bundle', 'organization');
+  $query->orderBy('nid', 'ASC');
+  $query->range(0, 50);
+
+  // batch queue these with new field 'queued'
+
+  $queue = \Drupal::queue('node_main_queue');
+
+  $items = (int)$queue->numberOfItems();
+
+  $nids = $query->execute()->fetchCol();
+  $nodes = \Drupal\node\Entity\Node::loadMultiple($nids);
+
+  // this will make sure that no more than 30000 nodes are queued at once
+  if($items <= 30000) {
+
+    foreach($nodes as $node) {
+      if($node instanceof \Drupal\node\NodeInterface) {
+        $queue->createItem($node);
+      }
+    }
+  }
+
+
+}
+
+function node_updates_install() {
+  $field_manager = \Drupal::service('entity_field.manager');
+  $field_storage_manager = \Drupal::service('field_storage_definition.listener');
+  $definition = $field_manager->getFieldStorageDefinitions('node')['queued'];
+  $field_storage_manager->onFieldStorageDefinitionCreate($definition);
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function node_updates_uninstall() {
+  $field_manager = \Drupal::service('entity_field.manager');
+  $field_storage_manager = \Drupal::service('field_storage_definition.listener');
+  $definition = $field_manager->getFieldStorageDefinitions('node')['queued'];
+  $field_storage_manager->onFieldStorageDefinitionDelete($definition);
+}
+
+/**
+ * Updates nodes to have a new base field definition 'queued'
+ * Note: removing this function may cause exceptions to be thrown from the database since it updates the default base node table
+ * @param EntityTypeInterface $entity_type
+ * @return array
+ */
+function node_updates_entity_base_field_info(EntityTypeInterface $entity_type) {
+  if ($entity_type->id() == 'node') {
+    $fields = [];
+    $fields['queued'] = BaseFieldDefinition::create('timestamp')
+      ->setLabel(t('Queued'))
+      ->setRequired(TRUE)
+      ->setDescription(t('Time when this feed was queued for refresh, 0 if not queued.'))
+      ->setName('queued')
+      ->setTargetEntityTypeId($entity_type->id())
+      ->setProvider('node_updates')
+      ->setTargetBundle(NULL)
+      ->setDefaultValue(0);
+    return $fields;
+  }
+}

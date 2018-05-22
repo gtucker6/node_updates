@@ -1,0 +1,15 @@
+node_updates.queue_settings:
+  path: '/admin/config/node_updates/node_updates_settings'
+  defaults:
+    _title: 'Node Updates Settings'
+    _form: 'Drupal\node_updates\Form\NodeUpdatesSettingsForm'
+  requirements:
+    _permission: 'administer site configuration'
+
+node_updates.update_queue_items_batch:
+  path: '/process-queue-items-batch'
+  defaults:
+    _title: 'Organization Batch Update'
+    _controller: '\Drupal\node_updates\Controller\NodeBatchUpdateController::batchOperations'
+  requirements:
+    _permission: 'administer content'
